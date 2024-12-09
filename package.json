@@ -1,0 +1,21 @@
+{
+  "name": "nomikin-bsky",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@atproto/api": "^0.13.19",
+    "dotenv": "^16.4.7",
+    "node-nlp": "^4.27.0"
+  }
+}
