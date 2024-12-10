@@ -1,9 +1,15 @@
 import { AtpAgent } from '@atproto/api';
-import {AppBskyFeedPost } from '@atproto/api';
 import * as dotenv from 'dotenv';
+import { randomInt } from 'crypto';
+import readline from 'readline';
 
 const agent = new AtpAgent({ service: 'https://bsky.social' });
-const searchFor = "ai";
+  const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+const keywords = ["ai", "machine learning", "data science", "blockchain", "crypto", "nft", "web3", "decentralized", "metaverse", "virtual reality"];
 const maxresults = 5;
 
 function getEnvVar(key: string): string {
@@ -18,10 +24,33 @@ async function authenticate() {
   await agent.login({ identifier: getEnvVar("BSKY_HANDLE"), password: getEnvVar("BSKY_TOKEN") });
 }
 
-async function fetchPostsByKeyword(keyword: string) {
+async function searchAndAnalyze(keywords: string[]) {
   await authenticate();
-  const response = await agent.api.app.bsky.feed.searchPosts({ q: keyword, sort: "top", limit: maxresults });
-  return response.data.posts;
+  await new Promise(resolve => setTimeout(resolve, randomInt(1000, 5000))); // Simulate human interaction
+
+  const analyzedPosts = await searchPostsWithMultipleKeywords(keywords);
+
+  const posts = analyzedPosts.map(post => ({
+    post: post,
+    text: post.record?.text || 'No text content',
+    value: analyzePostInteractionValue(post),
+    uri: post.uri,
+    cid: post.cid,
+    url: `https://bsky.app/profile/${post.author.handle}/post/${post.uri.split('/').pop()}`
+  })).sort((a, b) => b.value - a.value);
+
+  return posts.slice(0, maxresults);
+}
+
+async function searchPostsWithMultipleKeywords(keywords: string[]): Promise<any[]> {
+  let allPosts = [];
+
+  for (const keyword of keywords) {
+    const response = await agent.api.app.bsky.feed.searchPosts({ q: keyword, limit: 50 });
+    allPosts = allPosts.concat(response.data.posts);
+  }
+
+  return Array.from(new Set(allPosts.map(p => p.uri))).map(uri => allPosts.find(p => p.uri === uri));
 }
 
 function analyzePostInteractionValue(post: any): number {
@@ -29,7 +58,7 @@ function analyzePostInteractionValue(post: any): number {
   const replies = post.replyCount || 0;
   const reposts = post.repostCount || 0;
   const views = post.viewCount || 1; // Avoid division by zero
-  
+
   const engagementRate = (likes + replies + reposts) / views;
 
   const authorFollowers = post.author?.followersCount || 0;
@@ -42,45 +71,91 @@ function analyzePostInteractionValue(post: any): number {
 
   return (
     (likes * 2) + 
-    replies + 
-    (reposts * 1.5) + 
-    (engagementRate * 100) +
-    authorInfluence + 
-    (recencyScore * 100)
+      replies + 
+      (reposts * 1.5) + 
+      (engagementRate * 100) +
+      authorInfluence + 
+      (recencyScore * 100)
   );
 }
 
-async function main(keyword: string) {
+const readLineAsync = (question: string): Promise<string> => {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer);
+    });
+  });
+};
+
+async function interactWithPost(post: any) {
+  const actions = ['like', 'repost', 'reply'];
+  const action = actions[randomInt(0, actions.length)];
+
+  switch (action) {
+    case 'like':
+      console.log('Liking post:', post.url);
+      console.log('Text:', post.text);
+      await agent.like(post.uri, post.cid);
+      break;
+    case 'repost':
+      console.log('Reposting:', post.url);
+      console.log('Text:', post.text);
+      await agent.repost(post.uri, post.cid);
+      break;
+    case 'reply':
+      console.log('Replying to post:', post.url);
+      console.log('Text:', post.text);
+
+      try {
+        const replyObject = {
+          root: {uri: post.uri, cid: post.cid},
+          parent: {uri: post.uri, cid: post.cid},
+        };
+        await agent.post({
+          text: await readLineAsync('Enter reply text: '),
+          reply: replyObject
+        });
+        console.log('Replied to post:', post.url);
+      } catch (error) {
+        console.error('Failed to reply to post:', error);
+      }
+      break;
+  }
+}
+
+async function createNewPost() {
+  return new Promise<string>((resolve) => {
+    rl.question('Enter new post content: ', (content) => {
+      resolve(content);
+    });
+  });
+}
+
+async function simulateHumanSearch(index: number) {
+  console.log(`Starting search session at ${new Date().toLocaleTimeString()}`);
+  const topPosts = await searchAndAnalyze(keywords.slice(index * 2, (index * 2) + 2));
+
+  for (let i = 0; i < topPosts.length; i++) {
+    const post = topPosts[i];
+    await new Promise(resolve => setTimeout(resolve, randomInt(500, 2000))); // Simulate human interaction
+    await interactWithPost(post);
+  }
+
+  const newPostContent = await createNewPost();
+  await agent.post({ text: newPostContent });
+  console.log('Posted:', newPostContent);
+}
+
+async function main() {
   dotenv.config();
 
   try {
-    const posts = await fetchPostsByKeyword(keyword);
-    const analyzedPosts = posts.map(post => ({
-      post: post,
-      text: (post.record as AppBskyFeedPost.Record).text || 'No text content',
-      engagementScore: analyzePostInteractionValue(post),
-      author: post.author.displayName + " | @" + post.author.handle,
-      likeCount: post.likeCount,
-      repostCount: post.repostCount,
-      replyCount: post.replyCount,
-      url: `https://bsky.app/profile/${post.author.handle}/post/${post.uri.split('/').pop()}`
-    })).sort((a, b) => b.engagementScore- a.engagementScore);
-
-    const topPosts = analyzedPosts.slice(0, maxresults);
-    console.log('Top valuable posts:', topPosts.map(p => ({
-      text: (p.post.record as AppBskyFeedPost.Record).text,
-      engagementScore: p.engagementScore,
-      author: p.author,
-      engagements: "Likes: " + p.likeCount + " | Reposts: " + p.repostCount + " | Replies: " + p.replyCount,
-      uri: p.url
-    })));
+    await simulateHumanSearch(0);
+    await simulateHumanSearch(1);
   } catch (error) {
     console.error('Failed to fetch or analyze posts:', error);
   }
 }
 
-console.log('Analyzing posts...');
-console.log('Keyword: ', searchFor);
-console.log('Limit: ', maxresults);
-main(searchFor).catch(console.error);
-console.log('Done.');
+main().catch(console.error);
+
