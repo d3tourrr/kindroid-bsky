@@ -1,16 +1,14 @@
 import { AtpAgent } from '@atproto/api';
 import * as dotenv from 'dotenv';
 import { randomInt } from 'crypto';
-import readline from 'readline';
+import { Logger } from 'tslog';
+import { sendMessage } from './kindroid';
 
 const agent = new AtpAgent({ service: 'https://bsky.social' });
-  const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
 
-const keywords = ["ai", "machine learning", "data science", "blockchain", "crypto", "nft", "web3", "decentralized", "metaverse", "virtual reality"];
+const keywords = ["ai", "machine learning", "data science", "blockchain", "crypto", "nft", "web3", "decentralized", "metaverse", "virtual reality", "bsky"];
 const maxresults = 5;
+const log = new Logger();
 
 function getEnvVar(key: string): string {
   const value = process.env[key];
@@ -34,6 +32,7 @@ async function searchAndAnalyze(keywords: string[]) {
     post: post,
     text: post.record?.text || 'No text content',
     value: analyzePostInteractionValue(post),
+    author: post.author.handle,
     uri: post.uri,
     cid: post.cid,
     url: `https://bsky.app/profile/${post.author.handle}/post/${post.uri.split('/').pop()}`
@@ -79,83 +78,80 @@ function analyzePostInteractionValue(post: any): number {
   );
 }
 
-const readLineAsync = (question: string): Promise<string> => {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      resolve(answer);
-    });
-  });
-};
-
 async function interactWithPost(post: any) {
   const actions = ['like', 'repost', 'reply'];
   const action = actions[randomInt(0, actions.length)];
 
   switch (action) {
     case 'like':
-      console.log('Liking post:', post.url);
-      console.log('Text:', post.text);
+      log.info('Liking post:', post.url);
+      log.info('Text:', post.text);
       await agent.like(post.uri, post.cid);
       break;
     case 'repost':
-      console.log('Reposting:', post.url);
-      console.log('Text:', post.text);
+      log.info('Reposting:', post.url);
+      log.info('Text:', post.text);
       await agent.repost(post.uri, post.cid);
       break;
     case 'reply':
-      console.log('Replying to post:', post.url);
-      console.log('Text:', post.text);
+      log.info('Replying to post:', post.url);
+      log.info('Text:', post.text);
 
       try {
         const replyObject = {
           root: {uri: post.uri, cid: post.cid},
           parent: {uri: post.uri, cid: post.cid},
         };
+        var reply = await getKindroidMessage("Reply to this post from " + post.author + "\n\n" + post.text);
+        log.info('Reply:', reply);
         await agent.post({
-          text: await readLineAsync('Enter reply text: '),
+          text: reply,
           reply: replyObject
         });
-        console.log('Replied to post:', post.url);
+        log.info('Replied to post:', post.url);
       } catch (error) {
-        console.error('Failed to reply to post:', error);
+        log.error('Failed to reply to post:', error);
       }
       break;
   }
 }
 
-async function createNewPost() {
-  return new Promise<string>((resolve) => {
-    rl.question('Enter new post content: ', (content) => {
-      resolve(content);
-    });
-  });
-}
-
 async function simulateHumanSearch(index: number) {
-  console.log(`Starting search session at ${new Date().toLocaleTimeString()}`);
+  log.info("Searching for posts with keywords:", keywords.slice(index * 2, (index * 2) + 2));
   const topPosts = await searchAndAnalyze(keywords.slice(index * 2, (index * 2) + 2));
 
   for (let i = 0; i < topPosts.length; i++) {
     const post = topPosts[i];
-    await new Promise(resolve => setTimeout(resolve, randomInt(500, 2000))); // Simulate human interaction
+    await new Promise(resolve => setTimeout(resolve, randomInt(15000, 35000))); // Simulate human interaction
     await interactWithPost(post);
   }
 
-  const newPostContent = await createNewPost();
+  const newPostContent = await getKindroidMessage('Create a new Bluesky post. Topic: Coffee culture. Tone: Cheerful.');
   await agent.post({ text: newPostContent });
-  console.log('Posted:', newPostContent);
+  log.info('Posted:', newPostContent);
+}
+
+async function getKindroidMessage(prompt: string): Promise<string> {
+  const config = { apiKey: getEnvVar('KIN_KEY') };
+  const messageContent = {
+    ai_id: getEnvVar('KIN_ID'),
+    message: prompt
+  };
+
+  return sendMessage(config, messageContent).then(response => response).catch(error => {
+    log.error('Failed to send message:', error.message);
+  });
 }
 
 async function main() {
   dotenv.config();
 
   try {
-    await simulateHumanSearch(0);
-    await simulateHumanSearch(1);
+    await simulateHumanSearch(randomInt(0, Math.floor(keywords.length / 2)));
   } catch (error) {
-    console.error('Failed to fetch or analyze posts:', error);
+    log.error('Failed to fetch or analyze posts:', error);
   }
 }
 
-main().catch(console.error);
+main().catch(log.error);
 
