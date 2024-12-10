@@ -3,6 +3,7 @@ import * as dotenv from 'dotenv';
 import { randomInt } from 'crypto';
 import { Logger } from 'tslog';
 import * as fs from 'fs/promises';
+import { CronJob } from 'cron';
 import { sendMessage, sendChatBreak } from './kindroid';
 
 // Constants
@@ -281,5 +282,27 @@ async function main() {
   }
 }
 
-main().catch(log.error);
+// Scheduling
+function getRandomDelay(min: number, max: number): number {
+  return randomInt(min, max) * 1000;
+}
+
+function runMainWithRandomDelay(minDelay: number, maxDelay: number) {
+  const delay = getRandomDelay(minDelay, maxDelay);
+  setTimeout(() => main().catch(log.error), delay);
+}
+
+const jobs = [
+    // Randomly between 8:01 AM and 8:39 AM
+  new CronJob('0 1-39 8 * * *', () => runMainWithRandomDelay(0, 38 * 60)),
+
+  // Randomly between 1:14 PM and 1:46 PM
+  new CronJob('0 14-46 13 * * *', () => runMainWithRandomDelay(0, 32 * 60)),
+
+  // Randomly between 7:31 PM and 7:54 PM
+  new CronJob('0 31-54 19 * * *', () => runMainWithRandomDelay(0, 23 * 60))
+]
+
+jobs.forEach(job => job.start());
+log.info('Scheduled jobs:', jobs.map(job => job.cronTime.source));
 
