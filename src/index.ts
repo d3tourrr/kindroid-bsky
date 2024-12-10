@@ -26,7 +26,6 @@ async function authenticate() {
 }
 
 async function searchAndAnalyze(keywords: string[]) {
-  await authenticate();
   await new Promise(resolve => setTimeout(resolve, randomInt(1000, 5000))); // Humans don't interact instantly
 
   const analyzedPosts = await searchPostsWithMultipleKeywords(keywords);
@@ -147,8 +146,9 @@ async function simulateHumanInteractions(index: number) {
   }
 
   log.info("Posting an original message...");
-  var topics = await parseTopicToneJSON('../topics.json');
-  var randomTopic = topics[Math.floor(Math.random() * topics.length)];
+  var topics = await parseTopicToneJSON('./topics.json');
+  var randomTopic = topics[randomInt(0, topics.length - 1)];
+
   log.info(`Random Topic: ${randomTopic.Topic}, Tone: ${randomTopic.Tone}`);
   const newPostContent = await getKindroidMessage(`Create a new Bluesky post. Topic: ${randomTopic.Topic}. Tone: ${randomTopic.Tone}.`);
   await agent.post({ text: newPostContent });
@@ -256,10 +256,10 @@ interface Topic {
 async function parseTopicToneJSON(filePath: string): Promise<Topic[]> {
   try {
     const jsonData = await fs.readFile(filePath, 'utf-8');
-    const dataArray = JSON.parse(jsonData) as { topic: string; tone: string }[];
+    const dataArray = JSON.parse(jsonData) as { Topic: string; Tone: string }[];
     const result: Topic[] = dataArray.map(item => ({
-      Topic: item.topic,
-      Tone: item.tone
+      Topic: item.Topic,
+      Tone: item.Tone
     }));
 
     return result;
@@ -274,6 +274,7 @@ async function main() {
   dotenv.config();
 
   try {
+    await authenticate();
     await simulateHumanInteractions(randomInt(0, Math.floor(keywords.length / 2)));
   } catch (error) {
     log.error('Failed to fetch or analyze posts:', error);
