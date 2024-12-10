@@ -1,0 +1,11 @@
+// Fill in your own values and rename the file to config.json
+[
+  {
+    "Topic": "Debugging",
+    "Tone": "Humorous",
+  },
+  {
+    "Topic": "Coding late nights",
+    "Tone": "Relatable",
+  },
+]

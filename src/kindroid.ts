@@ -1,5 +1,10 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 
+enum KindroidMessageType {
+  ChatBreak = 'chat-break',
+  SendMessage = 'send-message'
+}
+
 interface KindroidConfig {
   apiKey: string;
   baseURL?: string;
@@ -8,6 +13,11 @@ interface KindroidConfig {
 interface MessageContent {
   ai_id: string;
   message: string;
+}
+
+interface ChatBreakContent {
+  ai_id: string;
+  greeting: string;
 }
 
 class KindroidAPI {
@@ -23,8 +33,28 @@ class KindroidAPI {
   }
 
   public async sendMessageInternal(message: MessageContent): Promise<any> {
+    return this.sendKinCallInternal(message, KindroidMessageType.SendMessage);
+  }
+
+  public async sendChatBreakInternal(message: ChatBreakContent): Promise<any> {
+    this.sendKinCallInternal(message, KindroidMessageType.ChatBreak);
+  }
+
+  public async sendKinCallInternal(message: MessageContent | ChatBreakContent, callType: KindroidMessageType): Promise<any> {
+    var endpoint = '';
+    switch (callType) {
+      case KindroidMessageType.ChatBreak:
+        endpoint = '/chat-break';
+        break;
+      case KindroidMessageType.SendMessage:
+        endpoint = '/send-message';
+        break;
+      default:
+        throw new Error('Invalid call type.');
+    }
+
     try {
-      const response: AxiosResponse = await this.client.post('/send-message', message);
+      const response: AxiosResponse = await this.client.post(endpoint, message);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -54,20 +84,11 @@ function getAPIInstance(config: KindroidConfig): KindroidAPI {
 
 export async function sendMessage(config: KindroidConfig, message: MessageContent): Promise<any> {
   const api = getAPIInstance(config);
-  return api.sendMessageInternal(message); // Changed to public method
+  return api.sendMessageInternal(message);
 }
 
-// Example usage:
-// import { sendMessage } from './kindroid';
-//
-// const config = { apiKey: 'your_api_key_here' };
-// const messageContent = {
-//   aiId: 'some-ai-id',
-//   content: 'Hello, AI!'
-// };
-//
-// sendMessage(config, messageContent).then(response => {
-//   console.log('Message sent successfully:', response);
-// }).catch(error => {
-//   console.error('Failed to send message:', error.message);
-// });
+export async function sendChatBreak(config: KindroidConfig, message: ChatBreakContent): Promise<any> {
+  const api = getAPIInstance(config);
+  return api.sendChatBreakInternal(message);
+}
+
