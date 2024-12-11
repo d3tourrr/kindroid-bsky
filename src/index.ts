@@ -338,7 +338,7 @@ const jobs = [
   new CronJob('0 31 19 * * *', () => runMainWithRandomDelay(0, 23 * 60)),
 
   // Health check every 30 minutes
-  new CronJob('0 */10 * * * *', () => checkConn()),
+  new CronJob('0 */30 * * * *', () => checkConn()),
 ]
 
 jobs.forEach(job => job.start());
