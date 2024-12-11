@@ -23,6 +23,7 @@ function getEnvVar(key: string): string {
 
 // Bsky interactions
 async function authenticate() {
+  dotenv.config();
   await agent.login({ identifier: getEnvVar("BSKY_HANDLE"), password: getEnvVar("BSKY_TOKEN") });
 }
 
@@ -160,6 +161,8 @@ async function simulateHumanInteractions(index: number) {
 
   log.info("Initiating Kindroid chat break...");
   await initiateKindroidChatBreak();
+
+  log.info("All interactions completed.");
 }
 
 async function followUser(handle: string, agentSession: AtpAgent): Promise<void> {
@@ -200,7 +203,7 @@ async function getMentions(agent: AtpAgent): Promise<any[]> {
 }
 
 async function replyToMentions(agent: AtpAgent) {
-  const posts = await getMentions(agent);
+  const posts = await getMentionsAndReplies(agent);
 
   for (const post of posts) {
     await new Promise(resolve => setTimeout(resolve, randomInt(5000, 15000)));
@@ -222,6 +225,24 @@ async function replyToMentions(agent: AtpAgent) {
     }
   }
 }
+
+async function getMentionsAndReplies(agent: AtpAgent): Promise<any[]> {
+  try {
+    const mentionsResponse = await agent.api.app.bsky.notification.listNotifications();
+    const mentions = mentionsResponse.data.notifications.filter(notification => !notification.isRead && (notification.reason.toString().includes('mention') || notification.reason.toString().includes('reply')));
+
+    if (mentions.length > 0) {
+    } else {
+      log.info(`No mentions found for ${agent.session.handle}`);
+    }
+    return mentions;
+  } catch (error) {
+    log.error(`Failed to get mentions for ${agent.session.handle}:`, error);
+  }
+}
+
+// Call the function
+// getMentionsAndReplies();
 
 // Kindroid interactions
 async function getKindroidMessage(prompt: string): Promise<string> {
@@ -272,14 +293,28 @@ async function parseTopicToneJSON(filePath: string): Promise<Topic[]> {
 
 // Main online time
 async function main() {
-  dotenv.config();
-
   try {
     await authenticate();
     await simulateHumanInteractions(randomInt(0, Math.floor(keywords.length / 2)));
   } catch (error) {
     log.error('Failed to fetch or analyze posts:', error);
   }
+}
+
+async function checkConnectionHealth() {
+  try {
+    await authenticate();
+    await agent.api.app.bsky.actor.getProfile({ actor: 'bsky.app' });
+    log.info('Connection health check passed');
+    return true;
+  } catch (error) {
+    log.error('Connection health check failed:', error);
+    return false;
+  }
+}
+
+function checkConn() {
+  checkConnectionHealth();
 }
 
 // Scheduling
@@ -293,16 +328,20 @@ function runMainWithRandomDelay(minDelay: number, maxDelay: number) {
 }
 
 const jobs = [
-    // Randomly between 8:01 AM and 8:39 AM
-  new CronJob('0 1-39 8 * * *', () => runMainWithRandomDelay(0, 38 * 60)),
+  // Randomly between 8:01 AM and 8:39 AM
+  new CronJob('0 1 8 * * *', () => runMainWithRandomDelay(0, 38 * 60)),
 
   // Randomly between 1:14 PM and 1:46 PM
-  new CronJob('0 14-46 13 * * *', () => runMainWithRandomDelay(0, 32 * 60)),
+  new CronJob('0 14 13 * * *', () => runMainWithRandomDelay(0, 32 * 60)),
 
   // Randomly between 7:31 PM and 7:54 PM
-  new CronJob('0 31-54 19 * * *', () => runMainWithRandomDelay(0, 23 * 60))
+  new CronJob('0 31 19 * * *', () => runMainWithRandomDelay(0, 23 * 60)),
+
+  // Health check every 30 minutes
+  new CronJob('0 */10 * * * *', () => checkConn()),
 ]
 
 jobs.forEach(job => job.start());
 log.info('Scheduled jobs:', jobs.map(job => job.cronTime.source));
+log.info('Waiting for scheduled jobs to run...');
 
