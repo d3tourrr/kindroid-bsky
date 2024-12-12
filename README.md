@@ -89,7 +89,7 @@ You can set two environment variables to help with debugging:
 
 It's important to provide your Kin context on what it means to interact on Bluesky. Here's an example backstory you can use.
 
-> ![TIP]
+> [!TIP]
 > This is very strict guidance. You might want to adjust it if you intend to have normal interactions with your Kin, but it may result in your Kin posting in a way that is not suitable for Bluesky.
 
 ```
