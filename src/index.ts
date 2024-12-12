@@ -2,15 +2,44 @@ import { AtpAgent } from '@atproto/api';
 import * as dotenv from 'dotenv';
 import { randomInt } from 'crypto';
 import { Logger } from 'tslog';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
 import { CronJob } from 'cron';
+import { DateTime } from 'luxon';
 import { sendMessage, sendChatBreak } from './kindroid';
 
+// Timezone
+console.log('Current timezone:', process.env.TZ);
+
+// Config
+interface Topic {
+  Topic: string;
+  Tone: string;
+}
+
+interface Schedule {
+  Time: string;
+  MaxDelay: number;
+}
+
+interface Config {
+  BskyHandle: string;
+  KindroidId: string;
+  Keywords: string[];
+  InteractCount: number;
+  MaxMentionReply: number;
+  NewPostCount: number;
+  Schedules: Schedule[];
+  Topics: Topic[];
+}
+
 // Constants
+const config: Config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
 const agent = new AtpAgent({ service: 'https://bsky.social' });
-const keywords = ["ai", "machine learning", "data science", "blockchain", "crypto", "nft", "web3", "decentralized", "metaverse", "virtual reality", "bsky"];
-const maxresults = 5;
-const log = new Logger();
+const log = new Logger({
+  minLevel: Number.parseInt(process.env.LOG_LEVEL) || 3,
+  hideLogPositionForProduction: process.env.SHOW_POSITION === "TRUE" ? false : true,
+  prettyLogTimeZone: 'local'
+});
 
 // Setup
 function getEnvVar(key: string): string {
@@ -24,13 +53,13 @@ function getEnvVar(key: string): string {
 // Bsky interactions
 async function authenticate() {
   dotenv.config();
-  await agent.login({ identifier: getEnvVar("BSKY_HANDLE"), password: getEnvVar("BSKY_TOKEN") });
+  await agent.login({ identifier: config.BskyHandle, password: getEnvVar("BSKY_TOKEN") });
 }
 
 async function searchAndAnalyze(keywords: string[]) {
   await new Promise(resolve => setTimeout(resolve, randomInt(1000, 5000))); // Humans don't interact instantly
 
-  const analyzedPosts = await searchPostsWithMultipleKeywords(keywords);
+  const analyzedPosts = await searchPostsWithMultipleKeywords(keywords, config.InteractCount);
 
   const posts = analyzedPosts.map(post => ({
     post: post,
@@ -42,7 +71,7 @@ async function searchAndAnalyze(keywords: string[]) {
     url: `https://bsky.app/profile/${post.author.handle}/post/${post.uri.split('/').pop()}`
   })).sort((a, b) => b.value - a.value);
 
-  return posts.slice(0, maxresults);
+  return posts.slice(0, config.InteractCount);
 }
 
 async function searchPostsWithMultipleKeywords(keywords: string[], limit?: number, since?: string): Promise<any[]> {
@@ -121,7 +150,7 @@ async function interactWithPost(post: any) {
           root: {uri: post.uri, cid: post.cid},
           parent: {uri: post.uri, cid: post.cid},
         };
-        var reply = await getKindroidMessage("Reply to this post from " + post.author + "\n\n" + post.text);
+        var reply = await getKindroidMessage("Reply to this Bluesky post from " + post.author + "\n\n" + post.text);
         log.info('Reply:', reply);
         await agent.post({
           text: reply,
@@ -137,8 +166,8 @@ async function interactWithPost(post: any) {
 }
 
 async function simulateHumanInteractions(index: number) {
-  log.info("Searching for posts with keywords:", keywords.slice(index * 2, (index * 2) + 2));
-  const topPosts = await searchAndAnalyze(keywords.slice(index * 2, (index * 2) + 2));
+  log.info("Searching for posts with keywords:", config.Keywords.slice(index * 2, (index * 2) + 2));
+  const topPosts = await searchAndAnalyze(config.Keywords.slice(index * 2, (index * 2) + 2));
 
   log.info("Interacting with top posts...");
   for (let i = 0; i < topPosts.length; i++) {
@@ -148,8 +177,7 @@ async function simulateHumanInteractions(index: number) {
   }
 
   log.info("Posting an original message...");
-  var topics = await parseTopicToneJSON('./topics.json');
-  var randomTopic = topics[randomInt(0, topics.length - 1)];
+  var randomTopic = config.Topics[randomInt(0, config.Topics.length - 1)];
 
   log.info(`Random Topic: ${randomTopic.Topic}, Tone: ${randomTopic.Tone}`);
   const newPostContent = await getKindroidMessage(`Create a new Bluesky post. Topic: ${randomTopic.Topic}. Tone: ${randomTopic.Tone}.`);
@@ -187,21 +215,6 @@ async function followUser(handle: string, agentSession: AtpAgent): Promise<void>
   }
 }
 
-async function getMentions(agent: AtpAgent): Promise<any[]> {
-  try {
-    const mentions = await searchPostsWithMultipleKeywords([`mentions:${agent.session.handle}`], 5);
-    if (mentions.length > 0) {
-    } else {
-      log.info(`No mentions found for ${agent.session.handle}`);
-    }
-    return mentions;
-  } catch (error) {
-    log.error(`Failed to get mentions for ${agent.session.handle}:`, error);
-  }
-
-  return []
-}
-
 async function replyToMentions(agent: AtpAgent) {
   const posts = await getMentionsAndReplies(agent);
 
@@ -232,6 +245,13 @@ async function getMentionsAndReplies(agent: AtpAgent): Promise<any[]> {
     const mentions = mentionsResponse.data.notifications.filter(notification => !notification.isRead && (notification.reason.toString().includes('mention') || notification.reason.toString().includes('reply')));
 
     if (mentions.length > 0) {
+      log.info(`Found ${mentions.length} mentions for ${agent.session.handle}`);
+      if (mentions.length > config.MaxMentionReply) {
+        log.info(`Limiting mentions to ${config.MaxMentionReply}`);
+        const shuf = [...mentions];
+        shuf.sort(() => Math.random() - 0.5);
+        return shuf.slice(0, config.MaxMentionReply);
+      }
     } else {
       log.info(`No mentions found for ${agent.session.handle}`);
     }
@@ -241,61 +261,37 @@ async function getMentionsAndReplies(agent: AtpAgent): Promise<any[]> {
   }
 }
 
-// Call the function
-// getMentionsAndReplies();
-
 // Kindroid interactions
 async function getKindroidMessage(prompt: string): Promise<string> {
-  const config = { apiKey: getEnvVar('KIN_KEY') };
+  const kinConfig = { apiKey: getEnvVar('KIN_KEY') };
   const messageContent = {
-    ai_id: getEnvVar('KIN_ID'),
+    ai_id: config.KindroidId,
     message: prompt
   };
 
-  return sendMessage(config, messageContent).then(response => response).catch(error => {
+  return sendMessage(kinConfig, messageContent).then(response => response).catch(error => {
     log.error('Failed to send message:', error.message);
   });
 }
 
 async function initiateKindroidChatBreak() {
-  const config = { apiKey: getEnvVar('KIN_KEY') };
+  const kinConfig = { apiKey: getEnvVar('KIN_KEY') };
   const chatBreakContent = {
-    ai_id: getEnvVar('KIN_ID'),
+    ai_id: config.KindroidId,
     greeting: 'Waiting for instruction'
   };
 
-  return sendChatBreak(config, chatBreakContent).then(response => response).catch(error => {
+  return sendChatBreak(kinConfig, chatBreakContent).then(response => response).catch(error => {
     log.error('Failed to send chat break:', error.message);
   });
-}
-
-// Topics to discuss
-interface Topic {
-  Topic: string;
-  Tone: string;
-}
-
-async function parseTopicToneJSON(filePath: string): Promise<Topic[]> {
-  try {
-    const jsonData = await fs.readFile(filePath, 'utf-8');
-    const dataArray = JSON.parse(jsonData) as { Topic: string; Tone: string }[];
-    const result: Topic[] = dataArray.map(item => ({
-      Topic: item.Topic,
-      Tone: item.Tone
-    }));
-
-    return result;
-  } catch (error) {
-    log.error('Failed to parse JSON file:', error);
-    throw error;
-  }
 }
 
 // Main online time
 async function main() {
   try {
     await authenticate();
-    await simulateHumanInteractions(randomInt(0, Math.floor(keywords.length / 2)));
+    await simulateHumanInteractions(randomInt(0, Math.floor(config.Keywords.length / 2)));
+    log.info(`Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
   } catch (error) {
     log.error('Failed to fetch or analyze posts:', error);
   }
@@ -318,30 +314,82 @@ function checkConn() {
 }
 
 // Scheduling
+function timeToCron(timeString: string): string {
+  const [time, modifier] = timeString.split(' ');
+  let [hours, minutes] = time.split(':').map(Number);
+
+  if (modifier === "PM" && hours !== 12) {
+    hours += 12;
+  } else if (hours === 12 && modifier === "AM") {
+    hours = 0;
+  }
+
+  return `0 ${minutes} ${hours} * * *`;
+}
+
+function calculateNextRun(cronTime: string, timezone: string = 'local'): Date {
+  const now = DateTime.local().setZone(timezone);
+  const parts = cronTime.split(' ');
+
+  const second = 0;
+  const minute = Number(parts[1]);
+  const hour = Number(parts[2]);
+
+  let nextRun = now.set({ second, minute, hour });
+
+  if (nextRun <= now) {
+    // If the calculated time is in the past or now, move to the next day
+    nextRun = nextRun.plus({ days: 1 });
+  }
+
+  return nextRun.toJSDate();
+}
+
+function getNextJobToRun(jobs: CronJob[]): { job: CronJob; nextRun: Date } {
+  let nextJob: { job: CronJob; nextRun: Date } = {
+    job: null,
+    nextRun: new Date(8640000000000000) // Maximum date value
+  };
+
+  jobs.forEach(job => {
+    try {
+      const cronTime = job.cronTime.source;
+      const nextDate = calculateNextRun(cronTime.toString());
+
+      if (nextDate < nextJob.nextRun) {
+        nextJob = { job, nextRun: nextDate };
+      }
+    } catch (error) {
+      console.error('Error calculating next run time for job:', error);
+    }
+  });
+
+  return nextJob;
+}
+
 function getRandomDelay(min: number, max: number): number {
   return randomInt(min, max) * 1000;
 }
 
 function runMainWithRandomDelay(minDelay: number, maxDelay: number) {
   const delay = getRandomDelay(minDelay, maxDelay);
+  log.info(`Running main with delay of ${delay / 1000 / 60} minutes`);
   setTimeout(() => main().catch(log.error), delay);
 }
 
-const jobs = [
-  // Randomly between 8:01 AM and 8:39 AM
-  new CronJob('0 1 8 * * *', () => runMainWithRandomDelay(0, 38 * 60)),
+// Health check every 30 minutes
+(new CronJob('0 */30 * * * *', () => checkConn())).start();
 
-  // Randomly between 1:14 PM and 1:46 PM
-  new CronJob('0 14 13 * * *', () => runMainWithRandomDelay(0, 32 * 60)),
+const jobs = []
 
-  // Randomly between 7:31 PM and 7:54 PM
-  new CronJob('0 31 19 * * *', () => runMainWithRandomDelay(0, 23 * 60)),
+for (const schedule of config.Schedules) {
+  const cronExpression = timeToCron(schedule.Time);
+  jobs.push(new CronJob(cronExpression, () => runMainWithRandomDelay(0, schedule.MaxDelay * 60)));
+  log.info(`Scheduled run at ${schedule.Time} with max delay of ${schedule.MaxDelay} minutes. Next run: ${calculateNextRun(cronExpression).toLocaleString()}`);
+}
 
-  // Health check every 30 minutes
-  new CronJob('0 */30 * * * *', () => checkConn()),
-]
-
-jobs.forEach(job => job.start());
-log.info('Scheduled jobs:', jobs.map(job => job.cronTime.source));
+jobs.forEach(job => {job.start()});
+log.debug('Scheduled jobs:', jobs.map(job => job.cronTime.source));
 log.info('Waiting for scheduled jobs to run...');
+log.info(`Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
 

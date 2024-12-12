@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/cron": "^2.4.3",
     "@types/node": "^22.10.1",
     "axios": "^1.7.9",
     "tslog": "^4.9.3",
@@ -19,6 +20,7 @@
     "@atproto/api": "^0.13.19",
     "cron": "^3.3.0",
     "dotenv": "^16.4.7",
-    "node-nlp": "^4.27.0"
+    "node-nlp": "^4.27.0",
+    "timezone": "^1.0.23"
   }
 }

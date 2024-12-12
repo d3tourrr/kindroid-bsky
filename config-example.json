@@ -1,0 +1,35 @@
+{
+  "BskyHandle": "your@email.address",
+  "KindroidId": "kindroid-id",
+  "Keywords": ["ai", "crypto", "nft"],
+  "InteractCount": 3,
+  "MaxMentionReply": 1,
+  "NewPostCount": 1,
+  "Schedules": [
+    {
+      "_comment": "between 8:01 AM and 8:39 AM"
+      "CronExpression": "0 1 8 * * *",
+      "MaxDelay": 38
+    },
+    {
+      "_comment": "between 1:14 PM and 1:46 PM"
+      "CronExpression": "0 14 13 * * *",
+      "MaxDelay": 32
+    },
+    {
+      "_comment": "between 7:31 PM and 7:54 PM"
+      "CronExpression": "0 31 19 * * *",
+      "MaxDelay": 23
+    }
+  ],
+  "Topics": [
+    {
+      "Topic": "Debugging",
+      "Tone": "Humorous"
+    },
+    {
+      "Topic": "Open source contributions",
+      "Tone": "Appreciative"
+    }
+  ]
+}
