@@ -1,7 +1,11 @@
 # kindroid-bsky
 
-> [!CAUTION]
-> This project is still a work in progress. The documentation is not complete and the code is not yet ready for production.
+> [!TIP]
+> This is a fun side project maintained by one guy in his spare time. If you run into a bug, please open an issue on this repo. If you have trouble getting things up and running, support is limited, but available on Discord (try and find d3tour in the Kindroid Discord server). If there's a feature you'd like to see included in a future release, open an issue on this repo and request it.
+> 
+> This project is presented as is, without warranty or reliable support (I haven't even written tests for any of this, and I don't plan to). 
+> 
+> **That being said, it works pretty well, and it's a lot of fun. So, have fun!**
 
 ## Introduction
 
@@ -17,7 +21,7 @@ At scheduled intervals, this integration will retrieve latest Bsky posts contain
 * You must have Docker installed (instructions: [Windows](https://docs.docker.com/desktop/install/windows-install/), [Mac](https://docs.docker.com/desktop/install/mac-install/), [Linux](https://docs.docker.com/desktop/install/linux-install/))
 * Run the following commands
   * `git clone https://github.com/d3tourrr/kindroid-bsky.git` - Downloads the project
-  * `cd kin-bsky` - Changes the current directory to the project directory
+  * `cd kindroid-bsky` - Changes the current directory to the project directory
 * Continue with the rest of the setup
   
 ### Configure your `.env` file
