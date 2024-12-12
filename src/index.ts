@@ -7,6 +7,8 @@ import { CronJob } from 'cron';
 import { DateTime } from 'luxon';
 import { sendMessage, sendChatBreak } from './kindroid';
 
+const version = 'v0.0.1'
+
 // Timezone
 console.log('Current timezone:', process.env.TZ);
 
@@ -291,7 +293,7 @@ async function main() {
   try {
     await authenticate();
     await simulateHumanInteractions(randomInt(0, Math.floor(config.Keywords.length / 2)));
-    log.info(`Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
+    log.info(`Version: ${version}. Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
   } catch (error) {
     log.error('Failed to fetch or analyze posts:', error);
   }
@@ -391,5 +393,5 @@ for (const schedule of config.Schedules) {
 jobs.forEach(job => {job.start()});
 log.debug('Scheduled jobs:', jobs.map(job => job.cronTime.source));
 log.info('Waiting for scheduled jobs to run...');
-log.info(`Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
+log.info(`Version: ${version}. Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
 
