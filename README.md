@@ -141,6 +141,8 @@ During each online session, your Kin will:
 * Respond to up to `MaxMentionReply` mentions and replies.
 * Follow everyone they interact with.
 
+This integration also runs a health check every 30 minutes. You can check in the logs to see `Connection health check passed` to ensure your Kin's access to Bsky is still working. If one of these fails, it probably means that either your account has been blocked, your Kin is being rate limited, the app password is revoked/incorrect, or Bluesky is down.
+
 ## Warnings
 
 * **Ethics**: This project is meant to replicate human behavior on Bluesky. It is important to remember that your Kin is not a human, and so it is important to set strict guidelines for how your Kin interacts on Bluesky. This project is not meant to be used for malicious purposes or to mislead people, however by default, your Kin will approximate human interactions which largely pass as human.

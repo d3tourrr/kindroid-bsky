@@ -394,4 +394,5 @@ jobs.forEach(job => {job.start()});
 log.debug('Scheduled jobs:', jobs.map(job => job.cronTime.source));
 log.info('Waiting for scheduled jobs to run...');
 log.info(`Version: ${version}. Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
+checkConn()
 
