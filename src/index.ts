@@ -303,7 +303,7 @@ async function checkConnectionHealth() {
   try {
     await authenticate();
     await agent.api.app.bsky.actor.getProfile({ actor: 'bsky.app' });
-    log.info('Connection health check passed');
+    log.info(`Connection health check passed. Version: ${version}. Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
     return true;
   } catch (error) {
     log.error('Connection health check failed:', error);
@@ -393,6 +393,5 @@ for (const schedule of config.Schedules) {
 jobs.forEach(job => {job.start()});
 log.debug('Scheduled jobs:', jobs.map(job => job.cronTime.source));
 log.info('Waiting for scheduled jobs to run...');
-log.info(`Version: ${version}. Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
 checkConn()
 
