@@ -174,17 +174,20 @@ async function simulateHumanInteractions(index: number) {
   log.info("Interacting with top posts...");
   for (let i = 0; i < topPosts.length; i++) {
     const post = topPosts[i];
-    await new Promise(resolve => setTimeout(resolve, randomInt(15000, 35000))); // Humans don't interact instantly
+    await new Promise(resolve => setTimeout(resolve, randomInt(25000, 75000))); // Humans don't interact instantly
     await interactWithPost(post);
   }
 
-  log.info("Posting an original message...");
-  var randomTopic = config.Topics[randomInt(0, config.Topics.length - 1)];
+  log.info(`Posting ${config.NewPostCount} original messages...`);
+  for (let i = 0; i < config.NewPostCount; i++) {
+    await new Promise(resolve => setTimeout(resolve, randomInt(45000, 95000))); // Humans don't interact instantly
 
-  log.info(`Random Topic: ${randomTopic.Topic}, Tone: ${randomTopic.Tone}`);
-  const newPostContent = await getKindroidMessage(`Create a new Bluesky post. Topic: ${randomTopic.Topic}. Tone: ${randomTopic.Tone}.`);
-  await agent.post({ text: newPostContent });
-  log.info('Posted:', newPostContent);
+    var randomTopic = config.Topics[randomInt(0, config.Topics.length - 1)];
+    log.info(`Random Topic: ${randomTopic.Topic}, Tone: ${randomTopic.Tone}`);
+    const newPostContent = await getKindroidMessage(`Create a new Bluesky post. Topic: ${randomTopic.Topic}. Tone: ${randomTopic.Tone}.`);
+    await agent.post({ text: newPostContent });
+    log.info('Posted:', newPostContent);
+  }
 
   log.info("Replying to mentions...");
   await replyToMentions(agent);
@@ -221,7 +224,7 @@ async function replyToMentions(agent: AtpAgent) {
   const posts = await getMentionsAndReplies(agent);
 
   for (const post of posts) {
-    await new Promise(resolve => setTimeout(resolve, randomInt(5000, 15000)));
+    await new Promise(resolve => setTimeout(resolve, randomInt(45000, 95000)));
     try {
       const replyObject = {
         root: {uri: post.uri, cid: post.cid},
