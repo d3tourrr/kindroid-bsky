@@ -124,25 +124,24 @@ function analyzePostInteractionValue(post: any): number {
 }
 
 async function interactWithPost(post: any) {
-  // const actions = ['like', 'repost', 'reply'];
-  // const action = actions[randomInt(0, actions.length)];
-  const action = 'reply'
+  const actions = ['like', 'repost', 'reply'];
+  const action = actions[randomInt(0, actions.length)];
 
   switch (action) {
-    // case 'like':
-    //   log.info('Liking:', post.url);
-    //   log.info('Engagement Score:', post.value);
-    //   log.info('Text:', post.text);
-    //   await agent.like(post.uri, post.cid);
-    //   await followUser(post.author, agent).catch(log.error);
-    //   break;
-    // case 'repost':
-    //   log.info('Reposting:', post.url);
-    //   log.info('Engagement Score:', post.value);
-    //   log.info('Text:', post.text);
-    //   await agent.repost(post.uri, post.cid);
-    //   await followUser(post.author, agent).catch(log.error);
-    //   break;
+    case 'like':
+      log.info('Liking:', post.url);
+      log.info('Engagement Score:', post.value);
+      log.info('Text:', post.text);
+      await agent.like(post.uri, post.cid);
+      await followUser(post.author, agent).catch(log.error);
+      break;
+    case 'repost':
+      log.info('Reposting:', post.url);
+      log.info('Engagement Score:', post.value);
+      log.info('Text:', post.text);
+      await agent.repost(post.uri, post.cid);
+      await followUser(post.author, agent).catch(log.error);
+      break;
     case 'reply':
       log.info('Replying:', post.url);
       log.info('Engagement Score:', post.value);
