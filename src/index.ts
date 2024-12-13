@@ -1,7 +1,7 @@
 import { AtpAgent } from '@atproto/api';
 import * as dotenv from 'dotenv';
 import { randomInt } from 'crypto';
-import { Logger } from 'tslog';
+import { Logger, ILogObj } from 'tslog';
 import * as fs from 'fs';
 import { CronJob } from 'cron';
 import { DateTime } from 'luxon';
@@ -34,14 +34,59 @@ interface Config {
   Topics: Topic[];
 }
 
+// Logging
+const CUSTOM_LEVELS = {
+  LIKE: 'LIKE',
+  RPST: 'RPST',
+  RPLY: 'RPLY',
+  MNTN: 'MNTN',
+  FLLW: 'FLLW',
+  POST: 'POST',
+  SCHED: 'SCHED'
+};
+
+class CustomLogger<T extends ILogObj> extends Logger<T> {
+  constructor() {
+    super();
+  }
+
+  private customLog(type: keyof typeof CUSTOM_LEVELS, msg: string, ...args: unknown[]): void {
+    this.log(7, type, msg, ...args);
+  }
+
+  like(msg: string, ...args: unknown[]): void {
+    this.customLog("LIKE", msg, ...args);
+  }
+
+  repost(msg: string, ...args: unknown[]): void {
+    this.customLog("RPST", msg, ...args);
+  }
+
+  reply(msg: string, ...args: unknown[]): void {
+    this.customLog("RPLY", msg, ...args);
+  }
+
+  mention(msg: string, ...args: unknown[]): void {
+    this.customLog("MNTN", msg, ...args);
+  }
+
+  follow(msg: string, ...args: unknown[]): void {
+    this.customLog("FLLW", msg, ...args);
+  }
+
+  post(msg: string, ...args: unknown[]): void {
+    this.customLog("POST", msg, ...args);
+  }
+
+  schedule(msg: string, ...args: unknown[]): void {
+    this.customLog("SCHED", msg, ...args);
+  }
+}
+
 // Constants
+const log = new CustomLogger<ILogObj>();
 const config: Config = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
 const agent = new AtpAgent({ service: 'https://bsky.social' });
-const log = new Logger({
-  minLevel: Number.parseInt(process.env.LOG_LEVEL) || 3,
-  hideLogPositionForProduction: process.env.SHOW_POSITION === "TRUE" ? false : true,
-  prettyLogTimeZone: 'local'
-});
 
 // Setup
 function getEnvVar(key: string): string {
@@ -60,7 +105,6 @@ async function authenticate() {
 
 async function searchAndAnalyze(keywords: string[]) {
   await new Promise(resolve => setTimeout(resolve, randomInt(1000, 5000))); // Humans don't interact instantly
-
   const analyzedPosts = await searchPostsWithMultipleKeywords(keywords, config.InteractCount);
 
   const posts = analyzedPosts.map(post => ({
@@ -129,23 +173,23 @@ async function interactWithPost(post: any) {
 
   switch (action) {
     case 'like':
-      log.info('Liking:', post.url);
-      log.info('Engagement Score:', post.value);
-      log.info('Text:', post.text);
+      log.like('Liking:', post.url);
+      log.like('Engagement Score:', post.value);
+      log.like('Text:', post.text);
       await agent.like(post.uri, post.cid);
       await followUser(post.author, agent).catch(log.error);
       break;
     case 'repost':
-      log.info('Reposting:', post.url);
-      log.info('Engagement Score:', post.value);
-      log.info('Text:', post.text);
+      log.repost('Reposting:', post.url);
+      log.repost('Engagement Score:', post.value);
+      log.repost('Text:', post.text);
       await agent.repost(post.uri, post.cid);
       await followUser(post.author, agent).catch(log.error);
       break;
     case 'reply':
-      log.info('Replying:', post.url);
-      log.info('Engagement Score:', post.value);
-      log.info('Text:', post.text);
+      log.reply('Replying:', post.url);
+      log.reply('Engagement Score:', post.value);
+      log.reply('Text:', post.text);
 
       try {
         const replyObject = {
@@ -167,12 +211,12 @@ async function interactWithPost(post: any) {
         }
 
         var reply = await getKindroidMessage(prompt);
-        log.info('Reply:', reply);
+        log.reply('Reply:', reply);
         await agent.post({
           text: reply,
           reply: replyObject
         });
-        log.info('Replied to post:', post.url);
+        log.reply('Replied to post:', post.url);
         await followUser(post.author, agent).catch(log.error);
       } catch (error) {
         log.error('Failed to reply to post:', error);
@@ -197,10 +241,10 @@ async function simulateHumanInteractions(index: number) {
     await new Promise(resolve => setTimeout(resolve, randomInt(45000, 95000))); // Humans don't interact instantly
 
     var randomTopic = config.Topics[randomInt(0, config.Topics.length - 1)];
-    log.info(`Random Topic: ${randomTopic.Topic}, Tone: ${randomTopic.Tone}`);
+    log.post(`Random Topic: ${randomTopic.Topic}, Tone: ${randomTopic.Tone}`);
     const newPostContent = await getKindroidMessage(`Create a new Bluesky post. Topic: ${randomTopic.Topic}. Tone: ${randomTopic.Tone}.`);
     await agent.post({ text: newPostContent });
-    log.info('Posted:', newPostContent);
+    log.post('Posted:', newPostContent);
   }
 
   log.info("Replying to mentions...");
@@ -227,7 +271,7 @@ async function followUser(handle: string, agentSession: AtpAgent): Promise<void>
       },
     });
 
-    log.info(`Followed: ${handle}`);
+    log.follow(`Followed: ${handle}`);
   } catch (error) {
     log.error(`Failed to follow ${handle}:`, error);
     throw error;
@@ -239,9 +283,9 @@ async function replyToMentions(agent: AtpAgent) {
 
   for (const post of posts) {
     await new Promise(resolve => setTimeout(resolve, randomInt(45000, 95000)));
-    log.info('Replying to mention/reply:', post.uri);
-    log.info('Author:', post.author.handle);
-    log.info('Text:', post.record?.text);
+    log.mention('Replying to mention/reply:', post.uri);
+    log.mention('Author:', post.author.handle);
+    log.mention('Text:', post.record?.text);
 
     try {
       const replyObject = {
@@ -263,7 +307,7 @@ async function replyToMentions(agent: AtpAgent) {
       }
 
       var reply = await getKindroidMessage(prompt);
-      log.info('Reply:', reply);
+      log.mention('Reply:', reply);
       await agent.post({
         text: reply,
         reply: replyObject
@@ -294,7 +338,7 @@ async function getMentionsAndReplies(agent: AtpAgent): Promise<any[]> {
     } else {
       log.info(`No mentions found for ${agent.session.handle}`);
     }
-    return mentionsWithText;;
+    return mentionsWithText;
   } catch (error) {
     log.error(`Failed to get mentions for ${agent.session.handle}:`, error);
   }
@@ -330,7 +374,7 @@ async function main() {
   try {
     await authenticate();
     await simulateHumanInteractions(randomInt(0, Math.floor(config.Keywords.length / 2)));
-    log.info(`Version: ${version}. Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
+    log.schedule(`Version: ${version}. Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
   } catch (error) {
     log.error('Failed to fetch or analyze posts:', error);
   }
@@ -340,7 +384,7 @@ async function checkConnectionHealth() {
   try {
     await authenticate();
     await agent.api.app.bsky.actor.getProfile({ actor: 'bsky.app' });
-    log.info(`Connection health check passed. Version: ${version}. Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
+    log.schedule(`Connection health check passed. Version: ${version}. Next job to run at: ${getNextJobToRun(jobs).nextRun.toLocaleString()}`);
     return true;
   } catch (error) {
     log.error('Connection health check failed:', error);
@@ -399,7 +443,7 @@ function getNextJobToRun(jobs: CronJob[]): { job: CronJob; nextRun: Date } {
         nextJob = { job, nextRun: nextDate };
       }
     } catch (error) {
-      console.error('Error calculating next run time for job:', error);
+      log.error('Error calculating next run time for job:', error);
     }
   });
 
@@ -412,7 +456,7 @@ function getRandomDelay(min: number, max: number): number {
 
 function runMainWithRandomDelay(minDelay: number, maxDelay: number) {
   const delay = getRandomDelay(minDelay, maxDelay);
-  log.info(`Running main with delay of ${delay / 1000 / 60} minutes`);
+  log.schedule(`Running main with delay of ${delay / 1000 / 60} minutes`);
   setTimeout(() => main().catch(log.error), delay);
 }
 
@@ -424,11 +468,11 @@ const jobs = []
 for (const schedule of config.Schedules) {
   const cronExpression = timeToCron(schedule.Time);
   jobs.push(new CronJob(cronExpression, () => runMainWithRandomDelay(0, schedule.MaxDelay * 60)));
-  log.info(`Scheduled run at ${schedule.Time} with max delay of ${schedule.MaxDelay} minutes. Next run: ${calculateNextRun(cronExpression).toLocaleString()}`);
+  log.schedule(`Scheduled run at ${schedule.Time} with max delay of ${schedule.MaxDelay} minutes. Next run: ${calculateNextRun(cronExpression).toLocaleString()}`);
 }
 
 jobs.forEach(job => {job.start()});
 log.debug('Scheduled jobs:', jobs.map(job => job.cronTime.source));
-log.info('Waiting for scheduled jobs to run...');
+log.schedule('Waiting for scheduled jobs to run...');
 checkConn()
 
