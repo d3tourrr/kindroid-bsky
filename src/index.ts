@@ -90,7 +90,7 @@ async function searchPostsWithMultipleKeywords(keywords: string[], limit?: numbe
   let allPosts = [];
 
   for (const keyword of keywords) {
-    const response = await agent.api.app.bsky.feed.searchPosts({ q: keyword, limit: limit, since: since});
+    const response = await agent.api.app.bsky.feed.searchPosts({ q: keyword, limit: limit, since: since, lang: 'en' });
     allPosts = allPosts.concat(response.data.posts);
   }
 
@@ -124,24 +124,25 @@ function analyzePostInteractionValue(post: any): number {
 }
 
 async function interactWithPost(post: any) {
-  const actions = ['like', 'repost', 'reply'];
-  const action = actions[randomInt(0, actions.length)];
+  // const actions = ['like', 'repost', 'reply'];
+  // const action = actions[randomInt(0, actions.length)];
+  const action = 'reply'
 
   switch (action) {
-    case 'like':
-      log.info('Liking:', post.url);
-      log.info('Engagement Score:', post.value);
-      log.info('Text:', post.text);
-      await agent.like(post.uri, post.cid);
-      await followUser(post.author, agent).catch(log.error);
-      break;
-    case 'repost':
-      log.info('Reposting:', post.url);
-      log.info('Engagement Score:', post.value);
-      log.info('Text:', post.text);
-      await agent.repost(post.uri, post.cid);
-      await followUser(post.author, agent).catch(log.error);
-      break;
+    // case 'like':
+    //   log.info('Liking:', post.url);
+    //   log.info('Engagement Score:', post.value);
+    //   log.info('Text:', post.text);
+    //   await agent.like(post.uri, post.cid);
+    //   await followUser(post.author, agent).catch(log.error);
+    //   break;
+    // case 'repost':
+    //   log.info('Reposting:', post.url);
+    //   log.info('Engagement Score:', post.value);
+    //   log.info('Text:', post.text);
+    //   await agent.repost(post.uri, post.cid);
+    //   await followUser(post.author, agent).catch(log.error);
+    //   break;
     case 'reply':
       log.info('Replying:', post.url);
       log.info('Engagement Score:', post.value);
@@ -152,7 +153,21 @@ async function interactWithPost(post: any) {
           root: {uri: post.uri, cid: post.cid},
           parent: {uri: post.uri, cid: post.cid},
         };
-        var reply = await getKindroidMessage("Reply to this Bluesky post from " + post.author + "\n\n" + post.text);
+
+        var prompt = "Reply to this post from " + post.author + "\n\n" + post.text || "<no text>";
+
+        if (post.embed) {
+          if (post.embed.$type === 'app.bsky.embed.images') {
+            prompt += `\n\n${post.author.handle} attached ${post.embed.images.length} images:`;
+            post.embed.images.forEach(img => {
+              prompt += `\nURL: ${img.image} | Alt Text: ${img.alt || 'No alt text'}`;
+            });
+          } else if (post.embed.$type === 'app.bsky.embed.external') {
+            prompt += `\n\n${post.author.handle} linked to external media, probably a gif. URL: ${post.embed.external.uri} | Title: ${post.embed.external.title} | Description: ${post.embed.external.description}`;
+          }
+        }
+
+        var reply = await getKindroidMessage(prompt);
         log.info('Reply:', reply);
         await agent.post({
           text: reply,
@@ -230,7 +245,21 @@ async function replyToMentions(agent: AtpAgent) {
         root: {uri: post.uri, cid: post.cid},
         parent: {uri: post.uri, cid: post.cid},
       };
-      var reply = await getKindroidMessage("Reply to this post from " + post.author + " who @mentioned you directly.\n\n" + post.text);
+
+      var prompt = "Reply to this post from " + post.author.handle + " who @mentioned you directly.\n\n" + post.record?.text || "<no text>";
+
+      if (post.record.embed) {
+        if (post.embed.$type === 'app.bsky.embed.images') {
+          prompt += `\n\n${post.author.handle} attached ${post.record.embed.images.length} images:`;
+          post.record.embed.images.forEach(img => {
+            prompt += `\nURL: ${img.image} | Alt Text: ${img.alt || 'No alt text'}`;
+          });
+        } else if (post.record.embed.$type === 'app.bsky.embed.external') {
+            prompt += `\n\n${post.author.handle} linked to external media, probably a gif. URL: ${post.embed.external.uri} | Title: ${post.embed.external.title} | Description: ${post.embed.external.description}`;
+        }
+      }
+
+      var reply = await getKindroidMessage(prompt);
       log.info('Reply:', reply);
       await agent.post({
         text: reply,
@@ -248,19 +277,20 @@ async function getMentionsAndReplies(agent: AtpAgent): Promise<any[]> {
   try {
     const mentionsResponse = await agent.api.app.bsky.notification.listNotifications();
     const mentions = mentionsResponse.data.notifications.filter(notification => !notification.isRead && (notification.reason.toString().includes('mention') || notification.reason.toString().includes('reply')));
+    const mentionsWithText = mentions.filter(m => (m.record as { text?: string }).text !== undefined);
 
-    if (mentions.length > 0) {
+    if (mentionsWithText.length > 0) {
       log.info(`Found ${mentions.length} mentions for ${agent.session.handle}`);
-      if (mentions.length > config.MaxMentionReply) {
+      if (mentionsWithText.length > config.MaxMentionReply) {
         log.info(`Limiting mentions to ${config.MaxMentionReply}`);
-        const shuf = [...mentions];
+        const shuf = [...mentionsWithText];
         shuf.sort(() => Math.random() - 0.5);
         return shuf.slice(0, config.MaxMentionReply);
       }
     } else {
       log.info(`No mentions found for ${agent.session.handle}`);
     }
-    return mentions;
+    return mentionsWithText;;
   } catch (error) {
     log.error(`Failed to get mentions for ${agent.session.handle}:`, error);
   }
