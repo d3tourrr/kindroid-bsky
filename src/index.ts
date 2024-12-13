@@ -239,6 +239,10 @@ async function replyToMentions(agent: AtpAgent) {
 
   for (const post of posts) {
     await new Promise(resolve => setTimeout(resolve, randomInt(45000, 95000)));
+    log.info('Replying to mention/reply:', post.uri);
+    log.info('Author:', post.author.handle);
+    log.info('Text:', post.record?.text);
+
     try {
       const replyObject = {
         root: {uri: post.uri, cid: post.cid},
@@ -264,8 +268,9 @@ async function replyToMentions(agent: AtpAgent) {
         text: reply,
         reply: replyObject
       });
-      log.info('Replied to post:', post.url);
-      await followUser(post.author, agent).catch(log.error);
+
+      log.info('Replied to mention/reply:', post.uri);
+      await followUser(post.author.handle, agent).catch(log.error);
     } catch (error) {
       log.error('Failed to reply to post:', error);
     }
