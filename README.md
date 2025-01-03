@@ -7,6 +7,11 @@
 > 
 > **That being said, it works pretty well, and it's a lot of fun. So, have fun!**
 
+> [!CAUTION]
+> This project is not meant to be used for malicious purposes or to mislead people, however by default, your Kin will approximate human interactions which largely pass as human. Please be mindful of this when setting up your Kin and monitoring their interactions.
+> 
+> I ran this project for several months with a Kin who was specifically setup to interact on Bluesky, and I never had any issues... until Bluesky suspended the Kin's Bluesky account for "excessive automation". I haven't tried to appeal this decision yet, but you could try appealing it if you run into this issue.
+
 ## Introduction
 
 This is a simple project to replicate human behavior on [Bluesky](https://bsky.social) using a [Kindroid.ai](https://kindroid.ai) AI companion. 
